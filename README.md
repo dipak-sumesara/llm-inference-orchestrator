@@ -2,88 +2,149 @@
 
 ## Overview
 
-A production-style LLM orchestration system designed to handle:
+LLM Inference Orchestrator is a production-style backend system that
+models real-world LLM infrastructure patterns:
 
-- Asynchronous job ingestion
-- Background processing via a dedicated worker service
-- Retry with exponential backoff
-- Dead-letter handling after max retries
-- Idempotency protection for safe client retries
-- Redis-backed distributed queue
-- API and Worker process separation
+-   Asynchronous job ingestion
+-   Background worker processing
+-   Retry with exponential backoff
+-   Dead-letter handling
+-   Idempotency protection
+-   Redis-backed distributed queue
+-   API and Worker process separation
 
-This project simulates real-world LLM infrastructure constraints such as:
+This project demonstrates how resilient LLM infrastructure should behave
+under instability, retries, and concurrency.
 
-- External API instability
-- Transient failures
-- Client retry behavior
-- Eventual consistency
-- Distributed state coordination
-
----
+------------------------------------------------------------------------
 
 ## Architecture
 
 Client → API Service → Redis Queue → Worker Service → Redis Job Store
 
-**API Service**
-- Stateless request ingestion
-- Validates input
-- Supports idempotency keys
-- Exposes job status polling endpoint
+### API Service
 
-**Worker Service**
-- Independently consumes jobs from Redis
-- Executes simulated LLM call
-- Implements exponential backoff retry
-- Dead-letters failed jobs
-- Updates job state atomically
+-   Stateless request ingestion
+-   Input validation
+-   Idempotency key support
+-   Job status polling endpoint
 
-**Redis**
-- Queue storage
-- Job state persistence
-- Idempotency key mapping
-- Shared distributed coordination layer
+### Worker Service
 
----
+-   Consumes jobs from Redis
+-   Simulates or executes LLM calls
+-   Retries failed jobs with exponential backoff
+-   Dead-letters after max retries
+-   Updates job state atomically
+
+### Redis
+
+-   Queue storage
+-   Job persistence
+-   Idempotency key mapping
+-   Shared distributed coordination layer
+
+------------------------------------------------------------------------
 
 ## Features
 
-- `POST /jobs` — Asynchronous job submission
-- `GET /jobs/:id` — Job status polling
-- Exponential backoff retry strategy
-- Dead-letter behavior after max retries
-- Idempotency via `x-idempotency-key`
-- Separate API and Worker processes
-- Redis-backed queue implementation
-- Failure simulation for resilience testing
+-   `POST /jobs` --- Submit job asynchronously
+-   `GET /jobs/:id` --- Poll job status
+-   Exponential backoff retry strategy
+-   Dead-letter after max retries
+-   Idempotency via `x-idempotency-key`
+-   API and Worker process separation
+-   Redis-backed queue implementation
+-   Failure simulation for resilience testing
 
----
+------------------------------------------------------------------------
 
-## Idempotency Handling
+## API Reference
+
+### Submit Job
+
+``` bash
+curl -X POST http://localhost:3000/jobs   -H "Content-Type: application/json"   -H "x-idempotency-key: unique-123"   -d '{"prompt":"Explain distributed systems"}'
+```
+
+Response:
+
+``` json
+{
+  "jobId": "uuid-v4",
+  "status": "queued"
+}
+```
+
+------------------------------------------------------------------------
+
+### Check Job Status
+
+``` bash
+curl http://localhost:3000/jobs/<jobId>
+```
+
+Queued response:
+
+``` json
+{
+  "id": "uuid",
+  "status": "queued"
+}
+```
+
+Completed response:
+
+``` json
+{
+  "id": "uuid",
+  "status": "completed",
+  "result": {
+    "response": "LLM response..."
+  }
+}
+```
+
+Failed response:
+
+``` json
+{
+  "id": "uuid",
+  "status": "failed",
+  "error": "Max retries exceeded"
+}
+```
+
+------------------------------------------------------------------------
+
+## Idempotency
 
 Clients may provide:
-x-idempotency-key: <unique-key>
 
+    x-idempotency-key: <unique-key>
 
-If the same idempotency key is reused, the system returns the original `jobId`
+If the same key is reused, the system returns the original `jobId`
 instead of creating duplicate jobs.
 
-This prevents duplicate processing when clients retry due to network failures.
+This guarantees safe retries when clients experience timeouts or network
+failures.
 
----
+------------------------------------------------------------------------
 
 ## Retry Strategy
 
-- Random failure simulation (to mimic unstable LLM APIs)
-- Exponential backoff:
+-   Random failure simulation (to mimic unstable LLM APIs)
+-   Exponential backoff formula:
 
-  backoff = base_delay * (2 ^ retries)
+```{=html}
+<!-- -->
+```
+    backoff = base_delay * (2 ^ retries)
 
-- Maximum retry threshold enforced
-- Failed jobs marked with `"status": "failed"`
+-   Maximum retry threshold enforced
+-   Failed jobs marked with `"status": "failed"`
 
----
+------------------------------------------------------------------------
 
 ## Run Locally
 
@@ -91,33 +152,43 @@ Ensure Redis is running locally.
 
 Start API:
 
-```bash
+``` bash
 npm run dev
+```
 
-## Start Worker (in separate terminal):
+Start Worker (in separate terminal):
+
+``` bash
 npm run dev:worker
+```
 
-Example Flow
-Submit Job
-curl -X POST http://localhost:3000/jobs \
-  -H "Content-Type: application/json" \
-  -H "x-idempotency-key: unique-123" \
-  -d '{"prompt":"Explain distributed systems"}'
-Check Status
-curl http://localhost:3000/jobs/<jobId>
-Why This Project Exists
+------------------------------------------------------------------------
 
-This system demonstrates:
+## Production Considerations
 
-Distributed systems thinking
+-   Run multiple worker replicas for horizontal scaling
+-   Use Redis persistence appropriately
+-   Add authentication and rate limiting
+-   Monitor queue length and retry metrics
+-   Add cost tracking when integrating real LLM providers
 
-Resilient job orchestration
+------------------------------------------------------------------------
 
-Failure-aware backend architecture
+## Why This Project Exists
 
-Safe client retry handling
+This repository demonstrates:
 
-Service separation and horizontal scaling readiness
+-   Distributed systems thinking
+-   Resilient job orchestration
+-   Failure-aware backend design
+-   Safe client retry handling
+-   Service separation and scaling readiness
 
-It models how production LLM infrastructure must behave under
-real-world instability, retries, and concurrency.
+It models how production LLM infrastructure should be built --- not just
+how to call an LLM API.
+
+------------------------------------------------------------------------
+
+## License
+
+MIT
